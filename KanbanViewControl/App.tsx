@@ -254,7 +254,7 @@ const App = ({ context, notificationPosition }: IProps) => {
   const locale = getLocaleFromLanguageId(
     (context as { userSettings?: { languageId?: number } }).userSettings?.languageId
   );
-  const { getOptionSets, getBusinessProcessFlows } = useDataverse(context, reportConfigError, clearConfigError);
+  const { getOptionSets, getBusinessProcessFlows, getLookupSets } = useDataverse(context, reportConfigError, clearConfigError);
   const { openForm, openEntityInNewTab } = useNavigation(context);
   const { dataset } = context.parameters;
   const showOpenInNewTabButton = (context.parameters as { showOpenInNewTabButton?: { raw?: boolean } }).showOpenInNewTabButton?.raw === true;
@@ -761,7 +761,8 @@ const App = ({ context, notificationPosition }: IProps) => {
       dataset.getTargetEntityType(),
       recordIds
     );
-    const allViews = [...(options ?? []), ...(process ?? [])];
+    const lookups = getLookupSets();
+    const allViews = [...(options ?? []), ...(lookups ?? []), ...(process ?? [])];
 
     if (allViews === undefined) {
       setIsLoading(false);

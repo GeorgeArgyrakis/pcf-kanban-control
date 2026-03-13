@@ -126,8 +126,8 @@ export const useDnD = (columns: ColumnItem[]) => {
     const sourceCard = sourceColumn?.cards?.find(i => i.id === itemId);
 
     if (sourceColumn?.id !== destinationColumn?.id) {
-      const updateFieldName = Object.keys(record.update ?? {})[0];
-      const newValue = updateFieldName ? record.update[updateFieldName] : undefined;
+      const updateFieldName = record.updateFieldName || Object.keys(record.update ?? {})[0];
+      const newValue = updateFieldName && record.update[updateFieldName] !== undefined ? record.update[updateFieldName] : Object.values(record.update)[0];
 
       const validation = await runCardMoveValidator({
         recordId: record.id,
@@ -172,11 +172,13 @@ export const useDnD = (columns: ColumnItem[]) => {
     
     if(!response) {
       const oldValue = sourceColumn?.title;
-      (sourceCard![Object.keys(record.update)[0]] as CardInfo).value = oldValue as string
+      const updateFieldName = record.updateFieldName || Object.keys(record.update)[0];
+      (sourceCard![updateFieldName] as CardInfo).value = oldValue as string
       movedCards = await moveCard(columns, sourceCard, result)
     } else {
       const updatedValue = destinationColumn?.title;
-      (sourceCard![Object.keys(record.update)[0]] as CardInfo).value = updatedValue as string
+      const updateFieldName = record.updateFieldName || Object.keys(record.update)[0];
+      (sourceCard![updateFieldName] as CardInfo).value = updatedValue as string
       movedCards = await moveCard(columns, sourceCard, result)
     }
 

@@ -26,6 +26,61 @@ export const useDataverse = (context: ComponentFramework.Context<IInputs>, onCon
         )
     }
 
+    const getLookupSets = () => {
+        const datasetColumns = dataset.columns.filter(col =>
+            col.dataType.startsWith("Lookup")
+        );
+
+        if (!datasetColumns || datasetColumns.length <= 0) {
+            return [];
+        }
+
+        const lookupViews = datasetColumns.map((column) => {
+            const uniqueValues = new Map();
+
+            // Extract unique lookup values from the currently loaded records
+            Object.values(dataset.records).forEach((record: any) => {
+                const rawValue = record.getValue(column.name);
+                const lookupValue = Array.isArray(rawValue) ? rawValue[0] : rawValue;
+
+                // PCF Lookup values are usually Reference objects with id and name, and entityType
+                if (lookupValue && lookupValue.id) {
+                    const idStr = typeof lookupValue.id === "object" && lookupValue.id !== null && "guid" in lookupValue.id 
+                        ? lookupValue.id.guid 
+                        : String(lookupValue.id);
+
+                    if (!uniqueValues.has(idStr)) {
+                        uniqueValues.set(idStr, {
+                            key: idStr, // Column ID
+                            id: idStr,
+                            label: lookupValue.name, // Display name of lookup
+                            title: lookupValue.name, // Important: App.tsx uses 'title' to match columns
+                            entityType: lookupValue.entityType || lookupValue.etn,
+                            order: 0
+                        });
+                    }
+                }
+            });
+
+            // Sort columns alphabetically
+            const columns = Array.from(uniqueValues.values()).sort((a, b) => {
+                const labelA = a.label || "";
+                const labelB = b.label || "";
+                return labelA.localeCompare(labelB);
+            });
+
+            return {
+                key: column.name,
+                text: column.displayName || column.name,
+                uniqueName: column.name,
+                dataType: column.dataType,
+                columns: columns
+            }
+        });
+
+        return lookupViews;
+    };
+
     const getStatusMetadata = async () => {
         try {
             const metadata = xrmService.fetch(`api/data/v9.2/EntityDefinitions(LogicalName='nl_opportunity')/Attributes/Microsoft.Dynamics.CRM.StatusAttributeMetadata?$select=LogicalName,DisplayName&$expand=OptionSet($select=Options,MetadataId)`)
@@ -232,6 +287,7 @@ export const useDataverse = (context: ComponentFramework.Context<IInputs>, onCon
         getStatusMetadata,
         getBusinessProcessFlows,
         getOptionSets,
-        getRecordCurrentStage
+        getRecordCurrentStage,
+        getLookupSets
     }
 }

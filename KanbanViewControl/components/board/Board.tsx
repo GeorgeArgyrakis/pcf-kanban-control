@@ -27,17 +27,34 @@ const Board = () => {
   const handleCardDrag = async (result: DropResult, _: ResponderProvided) => {
     try {
       const field = activeView?.uniqueName;
-      const columnName = activeView?.columns?.find(
-        (column) => column.id == result.destination?.droppableId
-      )?.title;
+      const targetColumnId = result.destination?.droppableId;
+      const targetColumn = activeView?.columns?.find((column) => column.id == targetColumnId);
+      const columnName = targetColumn?.title;
+
+      const targetValue: any = targetColumnId === "unallocated" ? null : targetColumnId;
+
+      const dataType = activeView?.dataType;
+      const isLookup = typeof dataType === "string" && (dataType === "Customer" || dataType === "Owner" || dataType.startsWith("Lookup."));
+      const updatePayload: any = {};
+
+      if (isLookup) {
+        if (targetValue !== null && targetColumn) {
+          const entityTypeStr = (targetColumn as any).entityType;
+          if (entityTypeStr) {
+            updatePayload[`${field}@odata.bind`] = `/${pluralizedLogicalNames(entityTypeStr)}(${targetColumn.id})`;
+          }
+        } else {
+          // Attempting to clear the lookup
+          updatePayload[field as string] = null;
+        }
+      } else {
+        updatePayload[field as string] = targetValue;
+      }
+
       const logicalName = pluralizedLogicalNames(selectedEntity as string);
       const record = {
-        update: {
-          [field as string]:
-            result.destination?.droppableId == "unallocated"
-              ? null
-              : result.destination?.droppableId,
-        },
+        updateFieldName: field as string,
+        update: updatePayload,
         logicalName: logicalName,
         entityName: selectedEntity,
         id: result.draggableId,
