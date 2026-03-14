@@ -9,10 +9,7 @@ import { BoardContext } from "../../context/board-context";
 import { useContext } from "react";
 import { MultiType } from "../../interfaces/card.type";
 
-interface HtmlSanitizeParams {
-  allowedHtmlTagsOnCard?: { raw?: string };
-  allowedHtmlAttributesOnCard?: { raw?: string };
-}
+// Removed HtmlSanitizeParams since we use fieldConfig directly.
 
 const SHADOW_HTML_SLOT_CLASS = "card-info-value--html-slot";
 
@@ -47,7 +44,7 @@ function getColumnDataType(dataset: { columns?: { name: string; dataType?: strin
 }
 
 const CardDetails = ({ id, fieldName, info, displayLabelOverride, renderAsHtml = false, hideLabel = false, widthPercent, lookupAsPersona = false, lookupPersonaIconOnly = false, showEmailAndPhoneAsLinks = false, textEllipsis = false }: ICardInfoProps) => {
-  const { context, openFormWithLoading } = useContext(BoardContext);
+  const { context, openFormWithLoading, fieldConfig } = useContext(BoardContext);
   const htmlHostRef = useRef<HTMLDivElement>(null);
   const columnDataType = getColumnDataType(context.parameters?.dataset as { columns?: { name: string; dataType?: string }[] }, fieldName);
   const isEmailField = showEmailAndPhoneAsLinks && isEmailColumnDataType(columnDataType);
@@ -77,9 +74,8 @@ const CardDetails = ({ id, fieldName, info, displayLabelOverride, renderAsHtml =
     : undefined;
   const onLinkClick = (e: React.MouseEvent) => e.stopPropagation();
 
-  const htmlSanitizeParams = context.parameters as HtmlSanitizeParams;
-  const allowedTagsRaw = htmlSanitizeParams.allowedHtmlTagsOnCard?.raw;
-  const allowedAttrsRaw = htmlSanitizeParams.allowedHtmlAttributesOnCard?.raw;
+  const allowedTagsRaw = fieldConfig.allowedHtmlTagsOnCard;
+  const allowedAttrsRaw = fieldConfig.allowedHtmlAttributesOnCard;
   const sanitizedHtml = renderAsHtml && htmlContent
     ? sanitizeHtml(htmlContent, allowedTagsRaw, allowedAttrsRaw)
     : "";

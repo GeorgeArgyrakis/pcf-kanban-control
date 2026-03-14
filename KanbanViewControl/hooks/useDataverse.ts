@@ -3,11 +3,12 @@ import { IInputs } from '../generated/ManifestTypes';
 import { isNullOrEmpty, orderStages } from '../lib/utils';
 import { ViewEntity } from '../interfaces';
 import { XrmService } from './service';
+import { IBpfConfig } from '../interfaces/IConfigInterfaces';
 
 export type ConfigErrorReporter = (property: string, message: string) => void;
 export type ClearConfigError = (property: string) => void;
 
-export const useDataverse = (context: ComponentFramework.Context<IInputs>, onConfigError?: ConfigErrorReporter, clearConfigError?: ClearConfigError) => {
+export const useDataverse = (context: ComponentFramework.Context<IInputs>, bpfConfig: IBpfConfig, onConfigError?: ConfigErrorReporter, clearConfigError?: ClearConfigError) => {
     const { parameters, webAPI } = context;
     const { dataset } = parameters;
     const entityName = useMemo(() => parameters.dataset.getTargetEntityType(), [])
@@ -102,30 +103,8 @@ export const useDataverse = (context: ComponentFramework.Context<IInputs>, onCon
                 `?$select=stagename,processstageid,stagecategory,_processid_value&$filter=primaryentitytypecode eq '${logicalName}'&$expand=processid($select=name,uniquename,statecode,uidata)`
             )
 
-            const filter = context.parameters.filteredBusinessProcessFlows?.raw ?? "";
-            let filterOutBusinessProcess: string[] | undefined;
-            if (!isNullOrEmpty(filter)) {
-                try {
-                    filterOutBusinessProcess = JSON.parse(filter);
-                    clearConfigError?.("filteredBusinessProcessFlows");
-                } catch (e) {
-                    const msg = e instanceof Error ? e.message : String(e);
-                    onConfigError?.("filteredBusinessProcessFlows", msg);
-                }
-            }
-
-            const stepOrderConfigRaw = context.parameters.businessProcessFlowStepOrder?.raw ?? "";
-            let stepOrderConfig: { id: string; order: number }[] | undefined;
-
-            if (!isNullOrEmpty(stepOrderConfigRaw)) {
-                try {
-                    stepOrderConfig = JSON.parse(stepOrderConfigRaw);
-                    clearConfigError?.("businessProcessFlowStepOrder");
-                } catch (e) {
-                    const msg = e instanceof Error ? e.message : String(e);
-                    onConfigError?.("businessProcessFlowStepOrder", msg);
-                }
-            }
+            const filterOutBusinessProcess = bpfConfig.filteredBusinessProcessFlows;
+            const stepOrderConfig = bpfConfig.businessProcessFlowStepOrder;
 
             const stagesReduced = stages.entities
                 .filter((stage: any) => (!filterOutBusinessProcess || !filterOutBusinessProcess.includes(stage.processid.name)) && stage.processid.statecode == 1)

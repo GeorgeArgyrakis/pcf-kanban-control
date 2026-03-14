@@ -22,16 +22,14 @@ function parseInitialCardsVisible(raw: unknown): number {
 }
 
 const Column = ({ column, widthPx }: { column: ColumnItem; widthPx?: number }) => {
-  const { context, draggingRef, openFormWithLoading } = useContext(BoardContext);
-  const allowCardMove = ((context.parameters as unknown) as { allowCardMove?: { raw?: boolean } }).allowCardMove?.raw !== false;
+  const { context, draggingRef, openFormWithLoading, cardConfig, boardConfig } = useContext(BoardContext);
+  const allowCardMove = cardConfig.allowCardMove !== false;
   const hasCards = !isNullOrEmpty(column.cards) && column.cards!.length > 0;
   const columnStyle = widthPx != null ? { width: widthPx, minWidth: widthPx, maxWidth: widthPx } : undefined;
   const cards = column.cards ?? [];
   const totalCount = cards.length;
 
-  const initialCardsVisible = parseInitialCardsVisible(
-    (context.parameters as { initialCardsVisible?: { raw?: unknown } }).initialCardsVisible?.raw
-  );
+  const initialCardsVisible = boardConfig.initialCardsVisible ?? INITIAL_CARDS_VISIBLE;
   const [visibleCount, setVisibleCount] = useState(initialCardsVisible);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
 

@@ -2,6 +2,7 @@ import { createContext } from "react";
 import { ColumnItem, ViewEntity, ViewItem } from "../interfaces";
 import { IInputs } from "../generated/ManifestTypes";
 import { IDropdownOption } from "@fluentui/react/lib/Dropdown";
+import { IGeneralConfig, IBoardConfig, ICardConfig, IFieldConfig, IFilterSortConfig, IBpfConfig } from "../interfaces/IConfigInterfaces";
 
 export interface ConfigError {
   property: string;
@@ -42,6 +43,12 @@ interface IBoardContext {
   /** App language locale (e.g. "en", "de") so the control can show localized strings. */
   locale: Locale,
   context: ComponentFramework.Context<IInputs>,
+  generalConfig: IGeneralConfig,
+  boardConfig: IBoardConfig,
+  cardConfig: ICardConfig,
+  fieldConfig: IFieldConfig,
+  filterSortConfig: IFilterSortConfig,
+  bpfConfig: IBpfConfig,
   activeView: ViewItem | undefined,
   setActiveView: React.Dispatch<React.SetStateAction<ViewItem | undefined>>,
   views: ViewItem[],

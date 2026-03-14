@@ -12,10 +12,10 @@ interface IProps {
 }
 
 const ColumnHeader = ({ column }: IProps) => {
-  const { context, activeView } = useContext(BoardContext);
+  const { context, activeView, generalConfig } = useContext(BoardContext);
   const { createNewRecord } = useNavigation(context);
 
-  const allowCreateNew = (context.parameters as { allowCreateNew?: { raw?: boolean } }).allowCreateNew?.raw !== false;
+  const allowCreateNew = generalConfig.allowCreateNew !== false;
 
   const onAddNewRecord = async (column: string) => {
     await createNewRecord(activeView?.key as string, column);

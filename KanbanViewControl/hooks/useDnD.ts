@@ -30,9 +30,10 @@ export const useDnD = (columns: ColumnItem[]) => {
     setColumns,
     openFormWithLoading,
     cardMoveValidationFunctionName,
+    bpfConfig,
   } = useContext(BoardContext);
   const strings = getStrings(locale);
-  const { updateRecord } = useDataverse(context);
+  const { updateRecord } = useDataverse(context, bpfConfig);
 
   const resolveValidationFunction = (): { fn: (args: CardMoveValidationArgs) => unknown; owner: unknown } | undefined => {
     if (!cardMoveValidationFunctionName) return undefined;

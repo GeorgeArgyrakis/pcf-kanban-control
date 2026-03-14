@@ -4,6 +4,7 @@ import { Board } from "./components";
 import { useMemo, useState, useRef, useCallback, useEffect } from "react";
 import { BoardContext, ConfigError, QuickFilterFieldConfig, SortFieldConfig, SortDirection, FilterPresetConfig } from "./context/board-context";
 import { ColumnItem, ViewItem, ViewEntity } from "./interfaces";
+import { IGeneralConfig, IBoardConfig, ICardConfig, IFieldConfig, IFilterSortConfig, IBpfConfig } from "./interfaces/IConfigInterfaces";
 import Loading from "./components/container/loading";
 import { Toaster } from "react-hot-toast";
 import { useDataverse } from "./hooks/useDataverse";
@@ -87,62 +88,19 @@ function getQuickFilterComparableValue(fieldValue: unknown): string {
   return String(fieldValue);
 }
 
-interface DefaultSortConfig {
-  field: string | null;
-  direction: SortDirection;
-}
-
-function parseDefaultSort(raw: string | undefined): DefaultSortConfig {
-  if (!raw?.trim()) return { field: null, direction: "asc" };
-  try {
-    const o = JSON.parse(raw.trim()) as { field?: string; direction?: string };
-    const field =
-      o?.field != null && typeof o.field === "string" && o.field.trim()
-        ? o.field.trim()
-        : null;
-    const direction =
-      o?.direction === "desc" || o?.direction === "asc" ? o.direction : "asc";
-    return { field, direction };
-  } catch {
-    return { field: null, direction: "asc" };
-  }
-}
-
-function parseQuickFilterFieldsRaw(
-  raw: string | undefined,
-  reportError: (property: string, message: string) => void,
-  clearError: (property: string) => void,
-  propertyName: string
-): string[] {
-  if (!raw?.trim()) return [];
-  const trimmed = raw.trim();
-  try {
-    if (trimmed.startsWith("[")) {
-      const arr = JSON.parse(trimmed) as unknown;
-      clearError(propertyName);
-      return Array.isArray(arr) ? arr.map((s) => String(s).trim()).filter(Boolean) : [];
-    }
-    return trimmed.split(",").map((s) => s.trim()).filter(Boolean);
-  } catch (e) {
-    if (trimmed.startsWith("[")) {
-      reportError(propertyName, e instanceof Error ? e.message : String(e));
-    }
-    return trimmed.split(",").map((s) => s.trim()).filter(Boolean);
-  }
-}
+// Removed parseDefaultSort and parseQuickFilterFieldsRaw
 
 interface IProps {
   context: ComponentFramework.Context<IInputs>;
-  notificationPosition:
-    | "top-center"
-    | "top-left"
-    | "top-right"
-    | "bottom-center"
-    | "bottom-left"
-    | "bottom-right";
+  generalConfig: IGeneralConfig;
+  boardConfig: IBoardConfig;
+  cardConfig: ICardConfig;
+  fieldConfig: IFieldConfig;
+  filterSortConfig: IFilterSortConfig;
+  bpfConfig: IBpfConfig;
 }
 
-const App = ({ context, notificationPosition }: IProps) => {
+const App = ({ context, generalConfig, boardConfig, cardConfig, fieldConfig, filterSortConfig, bpfConfig }: IProps) => {
   // View ID for local storage scope: store quick filters per view separately
   const viewId = (context.parameters?.dataset as { getViewId?: () => string })?.getViewId?.() ?? "";
   const quickFiltersStorageKey =
@@ -169,25 +127,18 @@ const App = ({ context, notificationPosition }: IProps) => {
       : ""
   );
   const defaultSortConfig = useMemo(
-    () =>
-      parseDefaultSort(
-        (context.parameters as { defaultSort?: { raw?: string } }).defaultSort?.raw
-      ),
-    [(context.parameters as { defaultSort?: { raw?: string } }).defaultSort?.raw]
+    () => ({
+      field: filterSortConfig.defaultSort?.field ?? null,
+      direction: (filterSortConfig.defaultSort?.direction === "desc" ? "desc" : "asc") as SortDirection,
+    }),
+    [filterSortConfig.defaultSort]
   );
 
-  const sortFieldsParamForInit = (context.parameters as { sortFields?: { raw?: string } })
-    .sortFields?.raw;
   const defaultSortFieldValid = useMemo(() => {
     if (!defaultSortConfig.field) return null;
-    const list = parseQuickFilterFieldsRaw(
-      sortFieldsParamForInit,
-      () => {},
-      () => {},
-      "sortFields"
-    );
-    return list.includes(defaultSortConfig.field!) ? defaultSortConfig.field : null;
-  }, [defaultSortConfig.field, sortFieldsParamForInit]);
+    const list = filterSortConfig.sortFields ?? [];
+    return list.includes(defaultSortConfig.field) ? defaultSortConfig.field : null;
+  }, [defaultSortConfig.field, filterSortConfig.sortFields]);
 
   const [sortByField, setSortByField] = useState<string | null>(() => {
     const stored = quickFiltersStorageKey
@@ -215,18 +166,18 @@ const App = ({ context, notificationPosition }: IProps) => {
   const openingRef = useRef(false);
 
   const cardMoveValidationFunctionName = useMemo(() => {
-    const raw = (context.parameters as { cardMoveValidationFunction?: { raw?: string } }).cardMoveValidationFunction?.raw;
+    const raw = cardConfig.cardMoveValidationFunction;
     if (typeof raw !== "string") return undefined;
     const trimmed = raw.trim();
     return trimmed || undefined;
-  }, [(context.parameters as { cardMoveValidationFunction?: { raw?: string } }).cardMoveValidationFunction?.raw]);
+  }, [cardConfig.cardMoveValidationFunction]);
 
   const cardMoveValidationScriptName = useMemo(() => {
-    const raw = (context.parameters as { cardMoveValidationScript?: { raw?: string } }).cardMoveValidationScript?.raw;
+    const raw = cardConfig.cardMoveValidationScript;
     if (typeof raw !== "string") return undefined;
     const trimmed = raw.trim();
     return trimmed || undefined;
-  }, [(context.parameters as { cardMoveValidationScript?: { raw?: string } }).cardMoveValidationScript?.raw]);
+  }, [cardConfig.cardMoveValidationScript]);
 
   useEffect(() => {
     if (!cardMoveValidationScriptName) return;
@@ -254,110 +205,77 @@ const App = ({ context, notificationPosition }: IProps) => {
   const locale = getLocaleFromLanguageId(
     (context as { userSettings?: { languageId?: number } }).userSettings?.languageId
   );
-  const { getOptionSets, getBusinessProcessFlows, getLookupSets } = useDataverse(context, reportConfigError, clearConfigError);
+  const { getOptionSets, getBusinessProcessFlows, getLookupSets } = useDataverse(context, bpfConfig, reportConfigError, clearConfigError);
   const { openForm, openEntityInNewTab } = useNavigation(context);
   const { dataset } = context.parameters;
-  const showOpenInNewTabButton = (context.parameters as { showOpenInNewTabButton?: { raw?: boolean } }).showOpenInNewTabButton?.raw === true;
+  const showOpenInNewTabButton = cardConfig.showOpenInNewTabButton === true;
 
   // Key for refresh: derived from current records on each render so that
   // after dataset.refresh() the display updates (even when PCF returns the same reference).
   const datasetRecordsKey =
     `${Object.keys(dataset.records).length}-${Object.keys(dataset.records).sort().slice(0, 100).join(",")}`;
 
-  const quickFilterFieldsParam = (context.parameters as { quickFilterFields?: { raw?: string } }).quickFilterFields?.raw;
   const quickFilterFieldsParsed = useMemo(
-    () => parseQuickFilterFieldsRaw(quickFilterFieldsParam, reportConfigError, clearConfigError, "quickFilterFields"),
-    [quickFilterFieldsParam, reportConfigError, clearConfigError]
+    () => filterSortConfig.quickFilterFields ?? [],
+    [filterSortConfig.quickFilterFields]
   );
 
-  const quickFilterFieldsInPopupParam = (context.parameters as { quickFilterFieldsInPopup?: { raw?: string } }).quickFilterFieldsInPopup?.raw;
   const quickFilterFieldsInPopupSet = useMemo((): Set<string> => {
-    const list = parseQuickFilterFieldsRaw(
-      quickFilterFieldsInPopupParam,
-      reportConfigError,
-      clearConfigError,
-      "quickFilterFieldsInPopup"
-    );
-    return new Set(list);
-  }, [quickFilterFieldsInPopupParam, reportConfigError, clearConfigError]);
+    return new Set(filterSortConfig.quickFilterFieldsInPopup ?? []);
+  }, [filterSortConfig.quickFilterFieldsInPopup]);
 
-  const sortFieldsParam = (context.parameters as { sortFields?: { raw?: string } }).sortFields?.raw;
   const sortFieldsParsed = useMemo(
-    () => parseQuickFilterFieldsRaw(sortFieldsParam, reportConfigError, clearConfigError, "sortFields"),
-    [sortFieldsParam, reportConfigError, clearConfigError]
+    () => filterSortConfig.sortFields ?? [],
+    [filterSortConfig.sortFields]
   );
 
-  // Filter presets JSON config: from component property "Filter presets" (filterPresets).
-  // Must be set to a static value (JSON array) in the view/form configuration of the component.
-  const params = context.parameters as unknown as Record<string, { raw?: string } | undefined>;
-  const filterPresetsParamRaw =
-    params.filterPresets?.raw ?? params["filterPresets"]?.raw;
-  const filterPresetsParam =
-    typeof filterPresetsParamRaw === "string" ? filterPresetsParamRaw.trim() : "";
   const filterPresetsConfig = useMemo((): FilterPresetConfig[] => {
-    if (!filterPresetsParam) return [];
-    try {
-      const arr = JSON.parse(filterPresetsParam) as unknown;
-      if (!Array.isArray(arr)) return [];
-      clearConfigError("filterPresets");
-      return arr
-        .filter((e): e is FilterPresetConfig => {
-          if (!e || typeof e !== "object") return false;
-          const id = (e as Record<string, unknown>).id;
-          const label = (e as Record<string, unknown>).label;
-          const filters = (e as Record<string, unknown>).filters;
-          if (typeof id !== "string" || !String(id).trim()) return false;
-          if (typeof label !== "string") return false;
-          if (filters == null || typeof filters !== "object" || Array.isArray(filters)) return false;
-          return true;
-        })
-        .map((e) => ({
-          id: String(e.id).trim(),
-          label: String(e.label),
-          filters: typeof e.filters === "object" && e.filters !== null && !Array.isArray(e.filters)
-            ? Object.fromEntries(
-                Object.entries(e.filters).map(([k, v]) => {
-                  if (Array.isArray(v)) {
-                    return [k, (v as unknown[]).map((x) => (x != null ? String(x) : ""))];
-                  }
-                  if (v != null && typeof v === "object" && "start" in v && "end" in v) {
-                    const start = String((v as { start: unknown }).start).trim();
-                    const end = String((v as { end: unknown }).end).trim();
-                    return [k, start && end ? `custom:${start}|${end}` : ""];
-                  }
-                  if (v != null) return [k, String(v)];
-                  return [k, ""];
-                })
-              )
-            : {},
-        }));
-    } catch (e) {
-      reportConfigError("filterPresets", e instanceof Error ? e.message : String(e));
-      return [];
-    }
-  }, [filterPresetsParam, reportConfigError, clearConfigError]);
+    const presets = filterSortConfig.filterPresets;
+    if (!Array.isArray(presets)) return [];
+    
+    return presets
+      .filter((e): e is FilterPresetConfig => {
+        if (!e || typeof e !== "object") return false;
+        const id = (e as Record<string, unknown>).id;
+        const label = (e as Record<string, unknown>).label;
+        const filters = (e as Record<string, unknown>).filters;
+        if (typeof id !== "string" || !String(id).trim()) return false;
+        if (typeof label !== "string") return false;
+        if (filters == null || typeof filters !== "object" || Array.isArray(filters)) return false;
+        return true;
+      })
+      .map((e) => ({
+        id: String(e.id).trim(),
+        label: String(e.label),
+        filters: typeof e.filters === "object" && e.filters !== null && !Array.isArray(e.filters)
+          ? Object.fromEntries(
+              Object.entries(e.filters).map(([k, v]) => {
+                if (Array.isArray(v)) {
+                  return [k, (v as unknown[]).map((x) => (x != null ? String(x) : ""))];
+                }
+                if (v != null && typeof v === "object" && "start" in v && "end" in v) {
+                  const start = String((v as { start: unknown }).start).trim();
+                  const end = String((v as { end: unknown }).end).trim();
+                  return [k, start && end ? `custom:${start}|${end}` : ""];
+                }
+                if (v != null) return [k, String(v)];
+                return [k, ""];
+              })
+            )
+          : {},
+      }));
+  }, [filterSortConfig.filterPresets]);
 
   const fieldDisplayNamesOnCardMap = useMemo((): Map<string, string> => {
-    const raw = (context.parameters as { fieldDisplayNamesOnCard?: { raw?: string } }).fieldDisplayNamesOnCard?.raw?.trim();
-    if (!raw) return new Map();
-    try {
-      const arr = JSON.parse(raw);
-      if (!Array.isArray(arr)) return new Map();
-      clearConfigError("fieldDisplayNamesOnCard");
-      const map = new Map<string, string>();
-      for (const e of arr) {
-        if (e && typeof e === "object" && "logicalName" in e && "displayName" in e) {
-          const name = String(e.logicalName).trim();
-          const displayName = String(e.displayName).trim();
-          if (name) map.set(name, displayName);
-        }
+    const list = fieldConfig.fieldDisplayNamesOnCard ?? [];
+    const map = new Map<string, string>();
+    for (const e of list) {
+      if (e && e.logicalName && e.displayName) {
+        map.set(e.logicalName.trim(), e.displayName.trim());
       }
-      return map;
-    } catch (e) {
-      reportConfigError("fieldDisplayNamesOnCard", e instanceof Error ? e.message : String(e));
-      return new Map();
     }
-  }, [(context.parameters as { fieldDisplayNamesOnCard?: { raw?: string } }).fieldDisplayNamesOnCard?.raw, reportConfigError, clearConfigError]);
+    return map;
+  }, [fieldConfig.fieldDisplayNamesOnCard]);
 
   const quickFilterFieldsConfig = useMemo((): QuickFilterFieldConfig[] => {
     if (!dataset?.columns) return [];
@@ -481,20 +399,12 @@ const App = ({ context, notificationPosition }: IProps) => {
   useEffect(() => {
     reportedConfigErrorsRef.current.clear();
   }, [
-    context.parameters.filteredBusinessProcessFlows?.raw,
-    context.parameters.businessProcessFlowStepOrder?.raw,
-    (context.parameters as { hiddenFieldsOnCard?: { raw?: string } }).hiddenFieldsOnCard?.raw,
-    (context.parameters as { htmlFieldsOnCard?: { raw?: string } }).htmlFieldsOnCard?.raw,
-    (context.parameters as { allowedHtmlTagsOnCard?: { raw?: string } }).allowedHtmlTagsOnCard?.raw,
-    (context.parameters as { allowedHtmlAttributesOnCard?: { raw?: string } }).allowedHtmlAttributesOnCard?.raw,
-    (context.parameters as { booleanFieldHighlights?: { raw?: string } }).booleanFieldHighlights?.raw,
-    (context.parameters as { fieldWidthsOnCard?: { raw?: string } }).fieldWidthsOnCard?.raw,
-    (context.parameters as { showEmailAndPhoneAsLinks?: { raw?: boolean } }).showEmailAndPhoneAsLinks?.raw,
-    (context.parameters as { ellipsisFieldsOnCard?: { raw?: string } }).ellipsisFieldsOnCard?.raw,
-    (context.parameters as { fieldDisplayNamesOnCard?: { raw?: string } }).fieldDisplayNamesOnCard?.raw,
-    (context.parameters as { quickFilterFields?: { raw?: string } }).quickFilterFields?.raw,
-    (context.parameters as { sortFields?: { raw?: string } }).sortFields?.raw,
-    filterPresetsParam,
+    generalConfig,
+    boardConfig,
+    cardConfig,
+    fieldConfig,
+    filterSortConfig,
+    bpfConfig
   ]);
 
   // Load current user display name (for {{currentUser}} placeholder in filter presets)
@@ -771,7 +681,7 @@ const App = ({ context, notificationPosition }: IProps) => {
 
     setViews(allViews);
 
-    const defaultView = context.parameters.defaultView?.raw;
+    const defaultView = generalConfig.defaultView;
 
     if (defaultView && !activeView) {
       const view = allViews.find((view) => view.text == defaultView);
@@ -868,6 +778,18 @@ const App = ({ context, notificationPosition }: IProps) => {
     [dataset.records, dataset.columns]
   );
 
+  const mappedNotificationPosition = useMemo(() => {
+    switch (generalConfig.notificationPosition) {
+      case "top": return "top-center";
+      case "topStart": return "top-left";
+      case "topEnd": return "top-right";
+      case "bottom": return "bottom-center";
+      case "bottomStart": return "bottom-left";
+      case "bottomEnd": return "bottom-right";
+      default: return "top-right";
+    }
+  }, [generalConfig.notificationPosition]);
+
   if (isLoading) {
     return <Loading label={getStrings(locale).loadingLabel} />;
   }
@@ -877,6 +799,12 @@ const App = ({ context, notificationPosition }: IProps) => {
       value={{
         locale,
         context,
+        generalConfig,
+        boardConfig,
+        cardConfig,
+        fieldConfig,
+        filterSortConfig,
+        bpfConfig,
         views,
         activeView,
         setActiveView,
@@ -931,7 +859,7 @@ const App = ({ context, notificationPosition }: IProps) => {
         )}
       </div>
       <Toaster
-        position={notificationPosition}
+        position={mappedNotificationPosition as any}
         reverseOrder={false}
         toastOptions={{
           style: { borderRadius: 4, padding: 16 },
