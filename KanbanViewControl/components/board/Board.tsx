@@ -33,7 +33,7 @@ const Board = () => {
       const targetValue: any = targetColumnId === "unallocated" ? null : targetColumnId;
 
       const dataType = activeView?.dataType;
-      const isLookup = typeof dataType === "string" && (dataType === "Customer" || dataType === "Owner" || dataType.startsWith("Lookup."));
+      const isLookup = typeof dataType === "string" && (dataType === "Customer" || dataType === "Owner" || dataType.startsWith("Lookup"));
       const updatePayload: any = {};
 
       if (isLookup) {
@@ -58,6 +58,7 @@ const Board = () => {
         entityName: selectedEntity,
         id: result.draggableId,
         columnName,
+        isDeleteLookup: isLookup && targetValue === null,
       };
 
       await onDragEnd(result, record);

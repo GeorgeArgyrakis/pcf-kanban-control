@@ -19,7 +19,70 @@ export const useDataverse = (context: ComponentFramework.Context<IInputs>, bpfCo
         return service;
     }, [context]);
 
+    const getNavProperty = async (clientUrl: string, entityName: string, logicalName: string) => {
+        const metaUrl = `${clientUrl}/api/data/v9.2/EntityDefinitions(LogicalName='${entityName}')/ManyToOneRelationships?$filter=ReferencingAttribute eq '${logicalName}'&$select=ReferencingEntityNavigationPropertyName`;
+        const metaReq = await fetch(metaUrl, {
+            headers: {
+                "Accept": "application/json",
+                "Content-Type": "application/json; charset=utf-8",
+                "OData-MaxVersion": "4.0",
+                "OData-Version": "4.0"
+            }
+        });
+        if (!metaReq.ok) {
+            throw new Error("Failed to retrieve relationship metadata: " + await metaReq.text());
+        }
+        const metaData = await metaReq.json();
+        if (!metaData.value || metaData.value.length === 0) {
+             throw new Error(`Could not find navigation property for ${logicalName}`);
+        }
+        return metaData.value[0].ReferencingEntityNavigationPropertyName;
+    }
+
     const updateRecord = async (record: any) => {
+        const clientUrl = (context as any).page?.getClientUrl() || (window as any).Xrm?.Utility?.getGlobalContext()?.getClientUrl();
+
+        if (record.isDeleteLookup) {
+            if (clientUrl) {
+                // 1. Resolve the navigation property name dynamically from the logical field name
+                const navProperty = await getNavProperty(clientUrl, record.entityName, record.updateFieldName);
+
+                // 2. Perform the DELETE request
+                const url = `${clientUrl}/api/data/v9.2/${record.logicalName}(${record.id})/${navProperty}/$ref`;
+                const req = await fetch(url, {
+                    method: "DELETE",
+                    headers: {
+                        "Accept": "application/json",
+                        "Content-Type": "application/json; charset=utf-8",
+                        "OData-MaxVersion": "4.0",
+                        "OData-Version": "4.0"
+                    }
+                });
+                if (!req.ok) {
+                    throw new Error(await req.text());
+                }
+                return;
+            } else {
+                record.update[`${record.updateFieldName}@odata.bind`] = null;
+            }
+        }
+
+        // Rewrite @odata.bind for regular lookup updates
+        const bindKey = `${record.updateFieldName}@odata.bind`;
+        if (record.update && bindKey in record.update) {
+            if (clientUrl) {
+                try {
+                    const navProperty = await getNavProperty(clientUrl, record.entityName, record.updateFieldName);
+                    if (navProperty && navProperty !== record.updateFieldName) {
+                        record.update[`${navProperty}@odata.bind`] = record.update[bindKey];
+                        delete record.update[bindKey];
+                    }
+                } catch (e) {
+                    console.log("Failed to resolve nav property for update", e);
+                }
+            }
+        }
+
         return await webAPI.updateRecord(
             record.entityName,
             record.id,
